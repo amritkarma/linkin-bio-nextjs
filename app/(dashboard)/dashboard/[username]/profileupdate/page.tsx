@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { RiLoader4Fill } from "react-icons/ri";
+import { getAvatarUrl } from "@/app/lib/client-utils";
 
 export default function EditProfilePage() {
   const { username } = useParams() as { username: string };
@@ -14,7 +15,6 @@ export default function EditProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     async function fetchProfile() {
@@ -25,11 +25,7 @@ export default function EditProfilePage() {
         const data = await res.json();
         setBio(data.bio || "");
         if (data.avatar_url) {
-          setAvatarPreview(
-            data.avatar_url.startsWith("http")
-              ? data.avatar_url
-              : `${apiUrl}${data.avatar_url}`
-          );
+          setAvatarPreview(getAvatarUrl(data.avatar_url));
         }
       } catch (err: unknown) {
         if (err instanceof Error) {

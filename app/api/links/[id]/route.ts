@@ -1,5 +1,5 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { getAccessToken, refreshTokens } from "@/app/lib/api-utils";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -16,13 +16,26 @@ interface LinkData {
 
 export async function GET(req: NextRequest, { params }: { params: Params }) {
   const { id } = await params;
-  const token = (await cookies()).get("token")?.value;
+  let token = await getAccessToken();
   if (!token) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
 
   try {
-    const res = await fetch(`${BASE_URL}/links/${id}`, {
+    let res = await fetch(`${BASE_URL}/links/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    // If token expired, try to refresh and retry
+    if (res.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        token = await getAccessToken();
+        if (token) {
+          res = await fetch(`${BASE_URL}/links/${id}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      }
+    }
 
     const data: LinkData | APIError = await res.json();
 
@@ -42,12 +55,12 @@ export async function GET(req: NextRequest, { params }: { params: Params }) {
 
 export async function PUT(req: NextRequest, { params }: { params: Params }) {
   const { id } = await params;
-  const token = (await cookies()).get("token")?.value;
+  let token = await getAccessToken();
   if (!token) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
 
   try {
     const body = await req.json();
-    const res = await fetch(`${BASE_URL}/links/${id}`, {
+    let res = await fetch(`${BASE_URL}/links/${id}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -55,6 +68,24 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
       },
       body: JSON.stringify(body),
     });
+
+    // If token expired, try to refresh and retry
+    if (res.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        token = await getAccessToken();
+        if (token) {
+          res = await fetch(`${BASE_URL}/links/${id}`, {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+        }
+      }
+    }
 
     const data: LinkData | APIError = await res.json();
     return NextResponse.json(data, { status: res.status });
@@ -66,14 +97,28 @@ export async function PUT(req: NextRequest, { params }: { params: Params }) {
 
 export async function DELETE(req: NextRequest, { params }: { params: Params }) {
   const { id } = await params;
-  const token = (await cookies()).get("token")?.value;
+  let token = await getAccessToken();
   if (!token) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
 
   try {
-    const res = await fetch(`${BASE_URL}/links/${id}`, {
+    let res = await fetch(`${BASE_URL}/links/${id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    // If token expired, try to refresh and retry
+    if (res.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        token = await getAccessToken();
+        if (token) {
+          res = await fetch(`${BASE_URL}/links/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      }
+    }
 
     const data: LinkData | APIError = await res.json();
     return NextResponse.json(data, { status: res.status });

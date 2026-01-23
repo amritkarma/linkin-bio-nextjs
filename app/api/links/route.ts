@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { getAccessToken, refreshTokens } from "@/app/lib/api-utils";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL; // 🔁 Point to your FastAPI backend
 
@@ -23,16 +24,31 @@ export async function GET(req: NextRequest) {
     }
 
     // 🔐 Authenticated fetch (user's own links)
-    const token = (await cookies()).get("token")?.value;
+    let token = await getAccessToken();
     if (!token) {
       return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
     }
 
-    const userRes = await fetch(`${BASE_URL}/links`, {
+    let userRes = await fetch(`${BASE_URL}/links`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
+
+    // If token expired, try to refresh and retry
+    if (userRes.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        token = await getAccessToken();
+        if (token) {
+          userRes = await fetch(`${BASE_URL}/links`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+        }
+      }
+    }
 
     const data = await userRes.json();
     return NextResponse.json(data, { status: userRes.status });
@@ -44,7 +60,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const token = (await cookies()).get("token")?.value;
+  let token = await getAccessToken();
   if (!token) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
@@ -52,7 +68,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const linkRes = await fetch(`${BASE_URL}/links`, {
+    let linkRes = await fetch(`${BASE_URL}/links`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -60,6 +76,24 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify(body),
     });
+
+    // If token expired, try to refresh and retry
+    if (linkRes.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        token = await getAccessToken();
+        if (token) {
+          linkRes = await fetch(`${BASE_URL}/links`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+        }
+      }
+    }
 
     const data = await linkRes.json();
     return NextResponse.json(data, { status: linkRes.status });

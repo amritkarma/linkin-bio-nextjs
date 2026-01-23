@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import toast, { Toaster } from 'react-hot-toast';
 import { RiLoader4Fill } from 'react-icons/ri';
+import { getAvatarUrl } from '@/app/lib/client-utils';
 
 type LinkItem = {
   id: number;
@@ -102,9 +103,7 @@ export default function DashboardPage() {
   if (error) return <p className="text-center text-red-600">{error}</p>;
   if (!profile) return null;
 
-  const avatarSrc = profile.avatar_url?.startsWith('http')
-    ? profile.avatar_url
-    : `http://localhost:8000${profile.avatar_url}`;
+  const avatarSrc = getAvatarUrl(profile.avatar_url);
 
   return (
     <div className="max-w-2xl mx-auto p-6">
