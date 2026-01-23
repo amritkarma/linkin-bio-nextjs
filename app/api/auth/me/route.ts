@@ -4,11 +4,61 @@ import { NextRequest, NextResponse } from "next/server";
 const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 const API_URL = `${apiUrl}/me`;
 
+async function refreshTokens(): Promise<boolean> {
+  const cookieStore = await cookies();
+  const refreshToken = cookieStore.get("refresh_token")?.value;
+
+  if (!refreshToken) {
+    return false;
+  }
+
+  try {
+    const refreshRes = await fetch(`${apiUrl}/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!refreshRes.ok) {
+      return false;
+    }
+
+    const refreshData = await refreshRes.json();
+
+    // Update tokens in cookies
+    cookieStore.set("token", refreshData.access_token, {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 30, // 30 minutes
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    cookieStore.set("refresh_token", refreshData.refresh_token, {
+      httpOnly: true,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET() {
-  const token = (await cookies()).get("token")?.value;
+  const cookieStore = await cookies();
+  let token = cookieStore.get("token")?.value;
 
   if (!token) {
-    return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+    // Try to refresh tokens
+    const refreshed = await refreshTokens();
+    if (!refreshed) {
+      return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+    }
+    token = cookieStore.get("token")?.value;
   }
 
   const res = await fetch(API_URL, {
@@ -17,8 +67,22 @@ export async function GET() {
     },
   });
 
-  const data = await res.json();
+  // If token expired, try to refresh and retry
+  if (res.status === 401) {
+    const refreshed = await refreshTokens();
+    if (refreshed) {
+      const newToken = cookieStore.get("token")?.value;
+      const retryRes = await fetch(API_URL, {
+        headers: {
+          Authorization: `Bearer ${newToken}`,
+        },
+      });
+      const retryData = await retryRes.json();
+      return NextResponse.json(retryData, { status: retryRes.status });
+    }
+  }
 
+  const data = await res.json();
   return NextResponse.json(data, { status: res.status });
 }
 

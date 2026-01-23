@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
@@ -14,5 +15,29 @@ export async function POST(req: Request) {
 
   const data = await res.json()
 
-  return NextResponse.json(data, { status: res.status })
+  if (!res.ok) {
+    return NextResponse.json(data, { status: res.status })
+  }
+
+  const cookieStore = await cookies();
+  
+  // Set the access token as a secure httpOnly cookie (30 minutes)
+  cookieStore.set("token", data.access_token, {
+    httpOnly: true,
+    path: "/",
+    maxAge: 60 * 30, // 30 minutes
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  // Set the refresh token as a secure httpOnly cookie (7 days)
+  cookieStore.set("refresh_token", data.refresh_token, {
+    httpOnly: true,
+    path: "/",
+    maxAge: 60 * 60 * 24 * 7, // 7 days
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  return NextResponse.json({ username: body.username }, { status: 200 })
 }
