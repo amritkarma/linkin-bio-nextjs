@@ -60,13 +60,13 @@ export async function refreshTokens(): Promise<boolean> {
  */
 export async function getAccessToken(): Promise<string | null> {
   const cookieStore = await cookies();
-  let token = cookieStore.get("token")?.value;
+  const token = cookieStore.get("token")?.value || null;
 
   if (!token) {
-    // Try to refresh tokens
     const refreshed = await refreshTokens();
     if (refreshed) {
-      token = cookieStore.get("token")?.value || null;
+      const refreshedCookieStore = await cookies();
+      return refreshedCookieStore.get("token")?.value || null;
     }
   }
 

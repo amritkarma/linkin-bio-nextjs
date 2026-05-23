@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken, refreshTokens } from "@/app/lib/api-utils";
 
@@ -6,7 +5,7 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 const API_URL = `${apiUrl}/me`;
 
 export async function GET() {
-  let token = await getAccessToken();
+  const token = await getAccessToken();
   if (!token) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }

@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { getAccessToken, refreshTokens } from "@/app/lib/api-utils";
 
